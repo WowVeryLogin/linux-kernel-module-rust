@@ -5,6 +5,9 @@
 #include <linux/slab.h>
 #include <linux/uaccess.h>
 #include <linux/version.h>
+#include <linux/spinlock.h>
+#include <linux/wait.h>
+#include <linux/poll.h>
 
 // Bindgen gets confused at certain things
 //

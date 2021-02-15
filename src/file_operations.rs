@@ -18,6 +18,10 @@ pub struct File {
     ptr: *const bindings::file,
 }
 
+extern "C" {
+   fn poll_wait_helper(f: *const bindings::file, h: *mut bindings::wait_queue_head_t, t: *const bindings::poll_table);
+}
+
 impl File {
     unsafe fn from_ptr(ptr: *const bindings::file) -> File {
         File { ptr }
@@ -29,6 +33,10 @@ impl File {
 
     pub fn flags(&self) -> FileFlags {
         FileFlags::from_bits_truncate(unsafe { (*self.ptr).f_flags })
+    }
+
+    pub fn poll_wait_helper(&self, h: *mut bindings::wait_queue_head_t, t: *const bindings::poll_table) {
+        unsafe { poll_wait_helper(self.ptr, h, t) }
     }
 }
 
@@ -138,23 +146,36 @@ unsafe extern "C" fn llseek_callback<T: FileOperations>(
     }
 }
 
+unsafe extern "C" fn poll_callback<T: FileOperations>(
+    file: *mut bindings::file,
+    table: *mut bindings::poll_table_struct,
+) -> c_types::c_uint  {
+    let f = &*((*file).private_data as *const T);
+    let t = &*table;
+    let poll = T::POLL.unwrap();
+    match poll(f, &File::from_ptr(file), t) {
+        Ok(result) => result as c_types::c_uint,
+        Err(e) => e.to_kernel_errno() as c_types::c_uint,
+    }
+}
+
 pub(crate) struct FileOperationsVtable<T>(marker::PhantomData<T>);
 
 impl<T: FileOperations> FileOperationsVtable<T> {
     pub(crate) const VTABLE: bindings::file_operations = bindings::file_operations {
         open: Some(open_callback::<T>),
         release: Some(release_callback::<T>),
-        read: if let Some(_) = T::READ {
+        read: if T::READ.is_some() {
             Some(read_callback::<T>)
         } else {
             None
         },
-        write: if let Some(_) = T::WRITE {
+        write: if T::WRITE.is_some() {
             Some(write_callback::<T>)
         } else {
             None
         },
-        llseek: if let Some(_) = T::SEEK {
+        llseek: if T::SEEK.is_some() {
             Some(llseek_callback::<T>)
         } else {
             None
@@ -193,7 +214,11 @@ impl<T: FileOperations> FileOperationsVtable<T> {
         #[cfg(kernel_4_15_0_or_greater)]
         mmap_supported_flags: 0,
         owner: ptr::null_mut(),
-        poll: None,
+        poll: if T::POLL.is_some() {
+            Some(poll_callback::<T>)
+        } else {
+            None
+        },
         #[cfg(kernel_3_16_0_or_greater)]
         read_iter: None,
         #[cfg(any(kernel_4_20_0_or_greater, all(os_centos, kernel_4_18_0_or_greater)))]
@@ -226,6 +251,7 @@ impl<T: FileOperations> FileOperationsVtable<T> {
 pub type ReadFn<T> = Option<fn(&T, &File, &mut UserSlicePtrWriter, u64) -> KernelResult<()>>;
 pub type WriteFn<T> = Option<fn(&T, &mut UserSlicePtrReader, u64) -> KernelResult<()>>;
 pub type SeekFn<T> = Option<fn(&T, &File, SeekFrom) -> KernelResult<u64>>;
+pub type PollFn<T> = Option<fn(&T, &File, &bindings::poll_table_struct) -> KernelResult<u32>>;
 
 /// `FileOperations` corresponds to the kernel's `struct file_operations`. You
 /// implement this trait whenever you'd create a `struct file_operations`.
@@ -247,4 +273,6 @@ pub trait FileOperations: Sync + Sized {
     /// Changes the position of the file. Corresponds to the `llseek` function
     /// pointer in `struct file_operations`.
     const SEEK: SeekFn<Self> = None;
+
+    const POLL: PollFn<Self> = None;
 }
