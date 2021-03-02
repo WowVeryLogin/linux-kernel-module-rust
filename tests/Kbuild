@@ -1,7 +1,7 @@
 obj-m := testmodule.o
 testmodule-objs := $(TEST_NAME).rust.o
 
-CARGO ?= cargo
+CARGO ?= cargo +nightly
 
 export c_flags
 

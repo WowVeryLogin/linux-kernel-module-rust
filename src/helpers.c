@@ -2,10 +2,31 @@
 #include <linux/printk.h>
 #include <linux/uaccess.h>
 #include <linux/version.h>
+#include <linux/poll.h>
 
 void bug_helper(void)
 {
     BUG();
+}
+
+void print_len(size_t n)
+{
+    printk(KERN_NOTICE "Rust: allocated length is: %lu\n", n);
+}
+
+void init_waitqueue_head_helper(wait_queue_head_t* h)
+{
+    init_waitqueue_head(h);
+}
+
+void wake_up_interruptible_helper(wait_queue_head_t* h)
+{
+    wake_up_interruptible(h);
+}
+
+void poll_wait_helper(struct file* f, wait_queue_head_t* h, poll_table* t)
+{
+    poll_wait(f, h, t);
 }
 
 int access_ok_helper(const void __user *addr, unsigned long n)

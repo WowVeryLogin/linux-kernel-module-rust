@@ -11,12 +11,16 @@ use crate::c_types;
 use crate::error::{Error, KernelResult};
 use crate::file_operations;
 use crate::types::CStr;
+use alloc::format;
+use crate::alloc::borrow::ToOwned;
 
 pub fn builder(name: CStr<'static>, minors: Range<u16>) -> KernelResult<Builder> {
     Ok(Builder {
         name,
         minors,
         file_ops: vec![],
+        sys_class: core::ptr::null_mut(),
+        parent_dev: core::ptr::null_mut()
     })
 }
 
@@ -24,6 +28,8 @@ pub struct Builder {
     name: CStr<'static>,
     minors: Range<u16>,
     file_ops: Vec<&'static bindings::file_operations>,
+    sys_class: *mut bindings::class,
+    parent_dev: *mut bindings::device,
 }
 
 impl Builder {
@@ -33,6 +39,16 @@ impl Builder {
         }
         self.file_ops
             .push(&file_operations::FileOperationsVtable::<T>::VTABLE);
+        self
+    }
+
+    pub fn register_class(
+        mut self,
+        sys_class: &mut bindings::class,
+        parent_dev: &mut bindings::device,
+    ) -> Builder {
+        self.parent_dev = parent_dev;
+        self.sys_class = sys_class;
         self
     }
 
@@ -66,6 +82,23 @@ impl Builder {
                     bindings::unregister_chrdev_region(dev, self.minors.len() as _);
                     return Err(Error::from_kernel_errno(rc));
                 }
+
+                let device = 
+                    bindings::device_create(
+                        self.sys_class,
+                        self.parent_dev,
+                        dev,
+                        core::ptr::null_mut(),
+                        format!("{}_%d\x00", self.name.to_owned()).as_ptr() as *const c_types::c_char,
+                        i,
+                    );
+                if device.is_null() {
+                    for j in 0..=i {
+                        bindings::cdev_del(&mut cdevs[j]);
+                    }
+                    bindings::unregister_chrdev_region(dev, self.minors.len() as _);
+                    return Err(Error::EFAULT);
+                }
             }
         }
 
@@ -73,6 +106,7 @@ impl Builder {
             dev,
             count: self.minors.len(),
             cdevs,
+            sys_class: self.sys_class,
         })
     }
 }
@@ -81,6 +115,7 @@ pub struct Registration {
     dev: bindings::dev_t,
     count: usize,
     cdevs: Box<[bindings::cdev]>,
+    sys_class: *mut bindings::class,
 }
 
 // This is safe because Registration doesn't actually expose any methods.
@@ -89,6 +124,7 @@ unsafe impl Sync for Registration {}
 impl Drop for Registration {
     fn drop(&mut self) {
         unsafe {
+            bindings::device_destroy(self.sys_class, self.dev);
             for dev in self.cdevs.iter_mut() {
                 bindings::cdev_del(dev);
             }

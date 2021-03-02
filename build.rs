@@ -2,7 +2,17 @@ use std::io::{BufRead, BufReader};
 use std::path::PathBuf;
 use std::{env, fs};
 
-const INCLUDED_TYPES: &[&str] = &["file_system_type", "mode_t", "umode_t", "ctl_table"];
+const INCLUDED_TYPES: &[&str] = &[
+    "file_system_type",
+    "mode_t",
+    "umode_t",
+    "ctl_table",
+    "ktime_t",
+    "poll_table",
+    "mutex",
+    "spinlock_t",
+    "wait_queue_head_t",
+];
 const INCLUDED_FUNCTIONS: &[&str] = &[
     "cdev_add",
     "cdev_init",
@@ -25,6 +35,19 @@ const INCLUDED_FUNCTIONS: &[&str] = &[
     "rng_is_initialized",
     "printk",
     "add_device_randomness",
+    "ktime_get",
+    "device_create",
+    "device_destroy",
+    "spin_lock_irq",
+    "spin_unlock_irq",
+    "spin_lock_init",
+    "mutex_lock",
+    "mutex_unlock",
+    "mutex_init",
+    "mutex_destroy",
+    "init_waitqueue_head",
+    "poll_wait",
+    "wake_up_interruptible",
 ];
 const INCLUDED_VARS: &[&str] = &[
     "EINVAL",
@@ -46,6 +69,8 @@ const INCLUDED_VARS: &[&str] = &[
     "SEEK_CUR",
     "SEEK_END",
     "O_NONBLOCK",
+    "POLLIN",
+    "POLLRDNORM",
 ];
 const OPAQUE_TYPES: &[&str] = &[
     // These need to be opaque because they're both packed and aligned, which rustc

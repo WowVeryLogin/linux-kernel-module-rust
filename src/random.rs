@@ -6,7 +6,9 @@ use crate::{bindings, c_types, error};
 /// that the CSPRNG has been seeded before generating any random bytes, and
 /// will block until it's ready.
 pub fn getrandom(dest: &mut [u8]) -> error::KernelResult<()> {
+    #[cfg(kernel_4_13_0_or_greater)]
     let res = unsafe { bindings::wait_for_random_bytes() };
+    #[cfg(kernel_4_13_0_or_greater)]
     if res != 0 {
         return Err(error::Error::from_kernel_errno(res));
     }

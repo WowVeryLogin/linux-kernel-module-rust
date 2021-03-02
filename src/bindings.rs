@@ -11,4 +11,9 @@ mod bindings {
 }
 pub use bindings::*;
 
+extern "C" {
+    pub fn init_waitqueue_head_helper(h: *mut wait_queue_head_t);
+    pub fn wake_up_interruptible_helper(h: *mut wait_queue_head_t);
+}
+
 pub const GFP_KERNEL: gfp_t = BINDINGS_GFP_KERNEL;
