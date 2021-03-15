@@ -66,6 +66,9 @@ impl Builder {
             return Err(Error::from_kernel_errno(res));
         }
 
+        let mut name_clear = self.name.to_owned();
+        name_clear.truncate(name_clear.len() - 1);
+
         // Turn this into a boxed slice immediately because the kernel stores pointers into it, and
         // so that data should never be moved.
         let mut cdevs = vec![unsafe { mem::zeroed() }; self.file_ops.len()].into_boxed_slice();
@@ -87,10 +90,9 @@ impl Builder {
                     bindings::device_create(
                         self.sys_class,
                         self.parent_dev,
-                        dev,
+                        dev + i as bindings::dev_t,
                         core::ptr::null_mut(),
-                        format!("{}_%d\x00", self.name.to_owned()).as_ptr() as *const c_types::c_char,
-                        i,
+                        format!("{}_{}\x00", name_clear, i).as_ptr() as *const c_types::c_char
                     );
                 if device.is_null() {
                     for j in 0..=i {
