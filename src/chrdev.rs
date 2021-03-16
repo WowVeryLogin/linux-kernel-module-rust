@@ -126,8 +126,8 @@ unsafe impl Sync for Registration {}
 impl Drop for Registration {
     fn drop(&mut self) {
         unsafe {
-            bindings::device_destroy(self.sys_class, self.dev);
-            for dev in self.cdevs.iter_mut() {
+            for (i, dev) in self.cdevs.iter_mut().enumerate() {
+                bindings::device_destroy(self.sys_class, self.dev + i as bindings::dev_t);
                 bindings::cdev_del(dev);
             }
             bindings::unregister_chrdev_region(self.dev, self.count as _);
