@@ -12,6 +12,7 @@ void bug_helper(void)
 void print_len(size_t n)
 {
     printk(KERN_NOTICE "Rust: allocated length is: %lu\n", n);
+    dump_stack();
 }
 
 void init_waitqueue_head_helper(wait_queue_head_t* h)

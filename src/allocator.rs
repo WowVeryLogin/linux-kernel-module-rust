@@ -14,7 +14,7 @@ unsafe impl GlobalAlloc for KernelAllocator {
     unsafe fn alloc(&self, layout: Layout) -> *mut u8 {
         // krealloc is used instead of kmalloc because kmalloc is an inline function and can't be
         // bound to as a result
-        // print_len(layout.size());
+        print_len(layout.size());
         bindings::krealloc(ptr::null(), layout.size(), bindings::GFP_KERNEL) as *mut u8
     }
 
